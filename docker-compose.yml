@@ -1,0 +1,17 @@
+services:
+  wortissimo:
+    build: .
+    restart: unless-stopped
+    # Bound to loopback deliberately: the only way in is `tailscale serve`,
+    # so the game is never exposed on the LAN or the public internet.
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # Games and flagged rounds survive a rebuild; the corpus ships in
+      # the image and is replaced by rebuilding it.
+      - wortissimo-data:/app/data/state
+    environment:
+      WORTISSIMO_GAMES: /app/data/state/games.sqlite
+
+volumes:
+  wortissimo-data:
