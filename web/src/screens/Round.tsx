@@ -43,16 +43,20 @@ export function Round({
   }, [connection, endsAt]);
 
   useEffect(() => {
-    connection.on("ack", (msg) => {
+    const offAck = connection.on("ack", (msg) => {
       if (msg.accepted) {
         setWords((prev) => (prev.includes(msg.word) ? prev : [msg.word, ...prev]));
       } else {
         setFlash(reasonText(msg.reason));
       }
     });
-    connection.on("state", (msg) => {
+    const offState = connection.on("state", (msg) => {
       setWords([...(msg.my_words as string[])].reverse());
     });
+    return () => {
+      offAck();
+      offState();
+    };
   }, [connection]);
 
   useEffect(() => {

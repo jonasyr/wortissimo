@@ -28,9 +28,16 @@ export class Connection {
     private readonly player: string,
   ) {}
 
-  on(type: string, handler: Handler): void {
+  /** Subscribe. Returns an unsubscribe function.
+   *
+   * Screens mount and unmount every round, so handlers registered without
+   * cleanup accumulate: after ten rounds a single `ack` would run through
+   * ten stale closures belonging to unmounted components.
+   */
+  on(type: string, handler: Handler): () => void {
     if (!this.handlers.has(type)) this.handlers.set(type, new Set());
     this.handlers.get(type)!.add(handler);
+    return () => this.handlers.get(type)?.delete(handler);
   }
 
   private emit(msg: any): void {

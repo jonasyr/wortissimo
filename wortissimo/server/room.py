@@ -17,7 +17,7 @@ from wortissimo.rules.scoring import score_round
 from wortissimo.rules.validate import Rejection, validate_word
 from wortissimo.server import db
 from wortissimo.server.protocol import (
-    Ack, RoundEnded, RoundSnapshot, RoundStarted, StateSync,
+    Ack, PlayerInfo, RoundEnded, RoundSnapshot, RoundStarted, StateSync,
 )
 from wortissimo.server.puzzles import Puzzle, PuzzleRepo
 
@@ -79,6 +79,10 @@ class Room:
         self.totals.setdefault(player.id, 0)
         return player
 
+    def roster(self) -> list[PlayerInfo]:
+        """Everyone in the room, in join order."""
+        return [PlayerInfo(id=p.id, name=p.name) for p in self.players.values()]
+
     # ----- config -----
 
     @property
@@ -100,7 +104,14 @@ class Room:
     # ----- rounds -----
 
     def start_round(self, now_ms: int) -> RoundStarted | None:
-        """Begin the next round. None if the game or the corpus is spent."""
+        """Begin the next round. None if one is running, or nothing is left.
+
+        Both players see a "next round" control, so two taps can race.
+        Starting a second round on top of a live one would discard the
+        first round's result before anyone saw it.
+        """
+        if self.round is not None:
+            return None
         if self.current_round_idx >= self.total_rounds:
             self.state = STATE_FINISHED
             db.set_game_state(self._conn, self.game_id, self.state)
@@ -238,4 +249,7 @@ class Room:
             ).get(player_id, [])
 
         return StateSync(state=self.state, round=round_snapshot,
-                         my_words=my_words, scores=dict(self.totals))
+                         my_words=my_words, scores=dict(self.totals),
+                         players=self.roster(),
+                         round_seconds=self.round_seconds,
+                         total_rounds=self.total_rounds)

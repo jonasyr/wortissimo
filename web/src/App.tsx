@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Connection } from "./lib/connection";
 import { Lobby } from "./screens/Lobby";
+import { Waiting } from "./screens/Waiting";
 import { Round } from "./screens/Round";
 import { Results, type RoundResult } from "./screens/Results";
 import "./styles.css";
 
+interface Player {
+  id: string;
+  name: string;
+}
+
 type View =
   | { kind: "lobby" }
-  | { kind: "waiting"; code: string }
+  | { kind: "waiting" }
   | { kind: "round"; sourceWord: string; endsAt: number; solutionCount: number }
   | { kind: "results"; result: RoundResult; finished: boolean };
 
@@ -15,15 +21,31 @@ export default function App() {
   const [view, setView] = useState<View>({ kind: "lobby" });
   const [opponentCount, setOpponentCount] = useState(0);
   const [flagged, setFlagged] = useState(false);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [me, setMe] = useState("");
+  const [code, setCode] = useState("");
+  const [connected, setConnected] = useState(false);
+  const [roundSeconds, setRoundSeconds] = useState(180);
+  const [totalRounds, setTotalRounds] = useState(10);
+  const [roundIdx, setRoundIdx] = useState(0);
   const connectionRef = useRef<Connection | null>(null);
 
   const join = (gameCode: string, player: string) => {
     const connection = new Connection(gameCode, player);
     connectionRef.current = connection;
+    setCode(gameCode);
+
+    connection.on("joined", (m) => {
+      setMe(m.player_id);
+      setConnected(true);
+    });
+
+    connection.on("players", (m) => setPlayers(m.players));
 
     connection.on("round_started", (m) => {
       setOpponentCount(0);
       setFlagged(false);
+      setRoundIdx(m.idx);
       setView({
         kind: "round",
         sourceWord: m.source_word,
@@ -33,7 +55,11 @@ export default function App() {
     });
 
     connection.on("state", (m) => {
+      if (m.players) setPlayers(m.players);
+      if (m.round_seconds) setRoundSeconds(m.round_seconds);
+      if (m.total_rounds) setTotalRounds(m.total_rounds);
       if (m.round) {
+        setRoundIdx(m.round.idx);
         setView({
           kind: "round",
           sourceWord: m.round.source_word,
@@ -41,20 +67,23 @@ export default function App() {
           solutionCount: m.round.solution_count,
         });
       } else if (m.state === "lobby" || m.state === "between") {
-        setView((v) => (v.kind === "results" ? v : { kind: "waiting", code: gameCode }));
+        setView((v) => (v.kind === "results" ? v : { kind: "waiting" }));
       }
     });
 
     connection.on("opponent_progress", (m) => setOpponentCount(m.count));
-    connection.on("round_ended", (m) =>
-      setView({ kind: "results", result: m.result, finished: false }),
-    );
+
+    connection.on("round_ended", (m) => {
+      setRoundIdx(m.idx + 1);
+      setView({ kind: "results", result: m.result, finished: false });
+    });
+
     connection.on("game_ended", () =>
       setView((v) => (v.kind === "results" ? { ...v, finished: true } : v)),
     );
 
     connection.connect();
-    setView({ kind: "waiting", code: gameCode });
+    setView({ kind: "waiting" });
   };
 
   useEffect(() => connectionRef.current?.watchVisibility(), [view.kind]);
@@ -63,15 +92,16 @@ export default function App() {
 
   if (view.kind === "waiting") {
     return (
-      <div className="app">
-        <div className="stack center">
-          <p className="muted">Spielcode — teile ihn mit deiner Mitspielerin</p>
-          <div className="code">{view.code}</div>
-          <button onClick={() => connectionRef.current?.startRound()}>
-            Runde starten
-          </button>
-        </div>
-      </div>
+      <Waiting
+        code={code}
+        players={players}
+        me={me}
+        roundSeconds={roundSeconds}
+        totalRounds={totalRounds}
+        roundIdx={roundIdx}
+        connected={connected}
+        onStart={() => connectionRef.current?.startRound()}
+      />
     );
   }
 
@@ -90,8 +120,10 @@ export default function App() {
   return (
     <Results
       result={view.result}
-      finished={view.finished}
+      finished={view.finished || roundIdx >= totalRounds}
       flagged={flagged}
+      roundIdx={roundIdx}
+      totalRounds={totalRounds}
       onNext={() => connectionRef.current?.startRound()}
       onFlagRound={() => {
         setFlagged(true);

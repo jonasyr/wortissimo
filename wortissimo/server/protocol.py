@@ -52,6 +52,18 @@ def parse_client_message(raw: str | bytes) -> ClientMessage:
 
 # ---------- server -> client ----------
 
+class PlayerInfo(BaseModel):
+    id: str
+    name: str
+
+
+class Players(BaseModel):
+    """Who is in the room. Broadcast whenever somebody joins or rejoins."""
+
+    type: Literal["players"] = "players"
+    players: list[PlayerInfo] = Field(default_factory=list)
+
+
 class Joined(BaseModel):
     type: Literal["joined"] = "joined"
     player_id: str
@@ -95,6 +107,9 @@ class StateSync(BaseModel):
     round: RoundSnapshot | None = None
     my_words: list[str] = Field(default_factory=list)
     scores: dict[str, int] = Field(default_factory=dict)
+    players: list[PlayerInfo] = Field(default_factory=list)
+    round_seconds: int = 180
+    total_rounds: int = 10
 
 
 class OpponentProgress(BaseModel):

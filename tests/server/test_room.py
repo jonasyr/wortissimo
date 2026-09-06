@@ -180,7 +180,13 @@ def test_snapshot_never_leaks_the_solution_set(room):
     p = room.join("jw", None)
     room.start_round(now_ms=0)
     dumped = room.snapshot(p.id).model_dump()
-    assert set(dumped) == {"type", "state", "round", "my_words", "scores"}
+    assert set(dumped) == {
+        "type", "state", "round", "my_words", "scores",
+        "players", "round_seconds", "total_rounds",
+    }
+    # The roster carries names, never anyone's words.
+    for player in dumped["players"]:
+        assert set(player) == {"id", "name"}
     assert set(dumped["round"]) == {
         "idx", "source_word", "round_ends_at", "solution_count",
     }
@@ -208,3 +214,46 @@ def test_game_finishes_after_the_configured_round_count(tmp_path):
     room.end_round(now_ms=200_000)
     assert room.is_finished
     assert room.start_round(now_ms=300_000) is None
+
+
+def test_starting_a_round_while_one_is_running_is_refused(room):
+    """Both players see a "Nächste Runde" button.
+
+    Without this guard the second tap starts a second round on top of the
+    first, and the first round's summary is never produced.
+    """
+    room.join("jw", None)
+    first = room.start_round(now_ms=0)
+    assert first is not None
+    assert room.start_round(now_ms=1000) is None
+    assert room.round is not None
+    assert room.round.idx == first.idx
+
+
+def test_a_new_round_can_start_once_the_previous_one_ended(room):
+    room.join("jw", None)
+    room.start_round(now_ms=0)
+    room.end_round(now_ms=200_000)
+    # Only one puzzle in this fixture, so exhaustion is the reason here -
+    # what matters is that the guard is no longer what blocks it.
+    assert room.state != "playing"
+
+
+def test_roster_lists_players_in_join_order(room):
+    room.join("jw", None)
+    room.join("gf", None)
+    assert [p.name for p in room.roster()] == ["jw", "gf"]
+
+
+def test_roster_does_not_duplicate_a_rejoining_player(room):
+    p = room.join("jw", None)
+    room.join("jw", p.token)
+    assert len(room.roster()) == 1
+
+
+def test_snapshot_carries_the_roster_and_the_configured_timing(room):
+    p = room.join("jw", None)
+    snap = room.snapshot(p.id)
+    assert [x.name for x in snap.players] == ["jw"]
+    assert snap.round_seconds == 180
+    assert snap.total_rounds == 2

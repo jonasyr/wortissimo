@@ -20,9 +20,13 @@ interface Props {
   onNext: () => void;
   onFlagRound: () => void;
   flagged: boolean;
+  roundIdx: number;
+  totalRounds: number;
 }
 
-export function Results({ result, finished, onNext, onFlagRound, flagged }: Props) {
+export function Results({
+  result, finished, onNext, onFlagRound, flagged, roundIdx, totalRounds,
+}: Props) {
   const found = new Set(result.scores.flatMap((s) => s.words)).size;
   const ranked = [...result.scores].sort(
     (a, b) => (result.totals[b.player] ?? 0) - (result.totals[a.player] ?? 0),
@@ -32,7 +36,8 @@ export function Results({ result, finished, onNext, onFlagRound, flagged }: Prop
     <div className="app">
       <div className="source-word">{result.source_word.toUpperCase()}</div>
       <p className="muted center" style={{ margin: "0 16px" }}>
-        {found} von {result.solution_count} gefunden
+        Runde {Math.min(roundIdx, totalRounds)} von {totalRounds} · {found} von{" "}
+        {result.solution_count} gefunden
       </p>
 
       <div className="stack">

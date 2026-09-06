@@ -12,8 +12,8 @@ from pydantic import BaseModel, Field, ValidationError
 from wortissimo.server import db
 from wortissimo.server.hub import Hub
 from wortissimo.server.protocol import (
-    Error, Join, Joined, OpponentProgress, Ping, Pong, StartRound, Submit,
-    parse_client_message,
+    Error, Join, Joined, OpponentProgress, Ping, Pong, Players, StartRound,
+    Submit, parse_client_message,
 )
 
 # I and O are omitted: unreadable next to 1 and 0 on a phone screen.
@@ -99,6 +99,9 @@ def create_app(
                     # Resync immediately: this is what lets a phone that
                     # locked mid-round pick up exactly where it left off.
                     await ws.send_text(room.snapshot(player.id).model_dump_json())
+                    # Tell everyone who is now in the room, the joiner
+                    # included, so the waiting screen stays current.
+                    await hub.broadcast(code, Players(players=room.roster()))
                     continue
 
                 if code is None or player_id is None:
