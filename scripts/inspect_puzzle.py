@@ -27,13 +27,21 @@ def show(conn: sqlite3.Connection, row: sqlite3.Row) -> None:
           f"long={meta.get('long_count')} "
           f"trivial={meta.get('trivial_share', 0):.0%}")
 
+    print("  REVEALED (shown as \"words you missed\"; * = cross-boundary):")
     for word, category, freq in conn.execute(
-        "SELECT word, category, freq FROM solutions WHERE puzzle_id=?"
-        " ORDER BY LENGTH(word) DESC, word",
+        "SELECT word, category, freq FROM solutions"
+        " WHERE puzzle_id=? AND revealed=1 ORDER BY LENGTH(word) DESC, word",
         (pid,),
     ):
         flag = "*" if category == "cross_boundary" else " "
-        print(f"   {flag} {word:<26} zipf {freq:.2f}")
+        print(f"   {flag} {word:<28} zipf {freq:.2f}")
+
+    hidden = [w for (w,) in conn.execute(
+        "SELECT word FROM solutions WHERE puzzle_id=? AND revealed=0"
+        " ORDER BY LENGTH(word) DESC, word", (pid,))]
+    if hidden:
+        print("  ACCEPTED ONLY (scored if typed, never revealed):")
+        print("    " + ", ".join(hidden))
 
 
 def main() -> int:
