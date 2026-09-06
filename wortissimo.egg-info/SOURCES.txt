@@ -1,0 +1,9 @@
+pyproject.toml
+wortissimo/__init__.py
+wortissimo.egg-info/PKG-INFO
+wortissimo.egg-info/SOURCES.txt
+wortissimo.egg-info/dependency_links.txt
+wortissimo.egg-info/requires.txt
+wortissimo.egg-info/top_level.txt
+wortissimo/rules/__init__.py
+wortissimo/rules/normalize.py
