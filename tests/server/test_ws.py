@@ -210,3 +210,12 @@ def test_opponent_sees_a_progress_count_but_no_words(client):
         recv_until(a, "ack")
         progress = recv_until(b, "opponent_progress")
         assert progress == {"type": "opponent_progress", "player": "jw", "count": 1}
+
+
+def test_flagging_a_round_appends_to_the_configured_file(client, tmp_path, monkeypatch):
+    from wortissimo.server import app as app_module
+
+    target = tmp_path / "state" / "flagged.txt"
+    monkeypatch.setattr(app_module, "FLAGGED_PATH", target)
+    assert client.post("/api/flag", json={"source_word": "kalkulation"}).json()["ok"]
+    assert target.read_text(encoding="utf-8").strip() == "kalkulation"

@@ -14,6 +14,7 @@ from wortissimo.generator.store import insert_puzzle
 from wortissimo.lexicon.lists import Lexicon
 from wortissimo.lexicon.packed import PackedWordSet
 
+COMMIT_EVERY = 50
 MIN_SOURCE_LENGTH = 15
 MAX_SOURCE_LENGTH = 40
 
@@ -119,6 +120,12 @@ def build_puzzles(
             continue  # already have this source word
         written += 1
         per_difficulty[str(difficulty)] = per_difficulty.get(str(difficulty), 0) + 1
+
+        # Commit as we go. Committing only at the end meant an interrupted
+        # build lost everything, which silently made --resume useless: there
+        # was never any partial state left to resume from.
+        if written % COMMIT_EVERY == 0:
+            conn.commit()
 
         if progress and written % 200 == 0:
             progress(seen, written)

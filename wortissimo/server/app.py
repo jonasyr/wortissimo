@@ -19,7 +19,7 @@ from wortissimo.server.protocol import (
 # I and O are omitted: unreadable next to 1 and 0 on a phone screen.
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"
 CODE_LENGTH = 4
-FLAGGED_PATH = Path("data/flagged.txt")
+FLAGGED_PATH = Path(os.environ.get("WORTISSIMO_FLAGGED", "data/flagged.txt"))
 
 
 class NewGame(BaseModel):

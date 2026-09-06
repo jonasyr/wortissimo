@@ -38,3 +38,17 @@ frankreich
 schweiz
 ilm
 genf
+
+# Vom Spieler in der Wortprüfung gesperrt (2026-09-06).
+# Hunspell hält sie für gültig; als angezeigte Lösung taugen sie nicht:
+# englische Lehnwörter, Namen und Flexionsfragmente.
+run
+sun
+san
+set
+ben
+esc
+ren
+schi
+rens
+ions

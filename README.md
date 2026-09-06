@@ -8,22 +8,36 @@ Gültige Wörter geben 1 Punkt, Wörter die nur einer gefunden hat 2 Punkte.
 
 ## Betrieb auf dem Homelab
 
-```bash
-docker compose up -d --build
-```
+Läuft als Stack im [homelab-Repo](https://github.com/jonasyr/homelab)
+unter `stacks/wortissimo/`, nach demselben Muster wie rummikub: ein
+`autodeploy.sh` holt dieses Repo nach
+`~/docker/data/wortissimo/repo` und baut den Container neu.
 
-Dann auf dem iPhone `http://<homeserver-ip>:8000` öffnen und über
-**Teilen → Zum Home-Bildschirm** installieren.
-
-Hinweis zum Service Worker: Über einfaches HTTP ist die Seite kein
-"secure context", iOS registriert dort also keinen Service Worker. Das
-Spiel selbst, die Installation auf dem Home-Bildschirm und die
-Standalone-Darstellung funktionieren trotzdem — es fehlt nur das
-Offline-Caching der App-Hülle. Wer das will, stellt TLS davor:
+Einmalige Einrichtung auf dem Server:
 
 ```bash
-sudo tailscale serve --bg --https=443 http://127.0.0.1:8000
+mkdir -p ~/docker/data/wortissimo/state
+git clone https://github.com/jonasyr/wortissimo.git ~/docker/data/wortissimo/repo
+cd ~/docker/stacks/wortissimo && docker compose up -d
 ```
+
+Danach genügt bei neuen Commits:
+
+```bash
+~/docker/stacks/wortissimo/autodeploy.sh
+```
+
+Erreichbar auf Port **3091**, über den Reverse Proxy als
+`http://wortissimo.home`.
+
+### Service Worker
+
+Über einfaches HTTP ist die Seite kein "secure context" — iOS registriert
+dort keinen Service Worker. Installation auf dem Home-Bildschirm und
+Standalone-Darstellung funktionieren trotzdem; es fehlt nur das
+Offline-Caching der App-Hülle. Da im Homelab ohnehin ein Nginx Proxy
+Manager mit Let's-Encrypt-Volume läuft, reicht dort ein Zertifikat für
+`wortissimo.home` — dann greift auch der Service Worker.
 
 ## Entwicklung
 

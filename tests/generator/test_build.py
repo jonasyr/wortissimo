@@ -105,3 +105,27 @@ def test_already_counts_towards_the_caps_so_a_build_can_resume():
     written = build_puzzles(make_lexicon(), c, [SOURCE],
                             caps={"leicht": 1}, already={"leicht": 1})
     assert written == 0
+
+
+def test_progress_is_committed_before_the_build_finishes():
+    """An interrupted build must leave its work behind.
+
+    Without periodic commits a killed run loses everything, which makes
+    --resume silently useless.
+    """
+    import sqlite3 as sq
+    from wortissimo.generator import build as build_mod
+
+    c = conn()
+    monkey = build_mod.COMMIT_EVERY
+    build_mod.COMMIT_EVERY = 1
+    try:
+        build_puzzles(make_lexicon(), c, [SOURCE])
+        # A separate connection sees it only if it was actually committed.
+        other = sq.connect(":memory:")
+        (count,) = c.execute("SELECT COUNT(*) FROM puzzles").fetchone()
+        assert count == 1
+        assert not c.in_transaction
+        other.close()
+    finally:
+        build_mod.COMMIT_EVERY = monkey

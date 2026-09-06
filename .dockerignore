@@ -1,0 +1,32 @@
+# Without this the build context ships several hundred MB to the daemon —
+# the virtualenv, node_modules, the raw dictionary and the 49MB acceptance
+# cache — none of which the image uses. On a home server that is the
+# difference between a fast build and a stalled one.
+
+.git/
+.venv/
+__pycache__/
+*.pyc
+
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+web/*.json.tmp
+web/pw.json
+web/vitest-out.json
+web/*.tsbuildinfo
+
+# Build-time only. The image ships data/puzzles.sqlite and nothing else
+# from data/.
+data/raw/
+data/acceptance.bin
+data/*.pkl
+data/games.sqlite*
+data/e2e-games.sqlite*
+data/puzzles-sample.sqlite
+data/flagged.txt
+
+tests/
+docs/
+scripts/

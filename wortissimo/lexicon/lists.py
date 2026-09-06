@@ -131,19 +131,37 @@ def build_lexicon(
     )
 
 
+def acceptance_cache_is_stale(
+    cache: Path = ACCEPTANCE_CACHE, blocklist_path: Path = BLOCKLIST_PATH
+) -> bool:
+    """True when the cache predates the blocklist that shaped it.
+
+    The cache is a filtered copy of the dictionary, so a blocklist edit
+    invalidates it. Keying only on the file's existence meant a newly
+    blocked word stayed in the corpus and the edit silently did nothing.
+    """
+    if not cache.exists():
+        return True
+    if not blocklist_path.exists():
+        return False
+    return blocklist_path.stat().st_mtime > cache.stat().st_mtime
+
+
 def load_or_build_acceptance(
     words: Iterable[str],
     blocklist: Container[str],
     cache: Path = ACCEPTANCE_CACHE,
     min_length: int = MIN_LENGTH,
+    blocklist_path: Path = BLOCKLIST_PATH,
 ) -> PackedWordSet:
-    """Load the packed acceptance set, building and caching it if absent.
+    """Load the packed acceptance set, rebuilding it when the blocklist moved.
 
-    Building it costs a ~280MB transient peak (sorting 2.15M strings);
-    loading the cached artifact costs ~40MB. On a memory-constrained
-    machine that difference decides whether the build survives.
+    Building costs a ~280MB transient peak (sorting 2.15M strings); loading
+    the cached artifact costs ~40MB. On a memory-constrained machine that
+    difference decides whether the build survives — but a stale cache
+    silently ignores blocklist edits, so freshness wins over speed.
     """
-    if cache.exists():
+    if not acceptance_cache_is_stale(cache, blocklist_path):
         return PackedWordSet.load(cache)
     packed = PackedWordSet.build(
         w for w in words if len(w) >= min_length and w not in blocklist

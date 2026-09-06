@@ -73,3 +73,33 @@ def test_blocklist_file_parsing(tmp_path):
     p = tmp_path / "b.txt"
     p.write_text("# comment\nberlin\n\n  hamburg  \n", encoding="utf-8")
     assert load_blocklist(p) == frozenset({"berlin", "hamburg"})
+
+
+def test_acceptance_cache_is_stale_when_missing(tmp_path):
+    from wortissimo.lexicon.lists import acceptance_cache_is_stale
+    assert acceptance_cache_is_stale(tmp_path / "nope.bin", tmp_path / "b.txt")
+
+
+def test_acceptance_cache_is_stale_when_the_blocklist_is_newer(tmp_path):
+    import os, time
+    from wortissimo.lexicon.lists import acceptance_cache_is_stale
+    cache = tmp_path / "acc.bin"
+    block = tmp_path / "b.txt"
+    cache.write_bytes(b"x")
+    time.sleep(0.01)
+    block.write_text("berlin\n", encoding="utf-8")
+    os.utime(block, (time.time() + 10, time.time() + 10))
+    # A blocklist edit must invalidate the cache, or the edit silently
+    # does nothing at all.
+    assert acceptance_cache_is_stale(cache, block)
+
+
+def test_acceptance_cache_is_fresh_when_older_blocklist(tmp_path):
+    import os, time
+    from wortissimo.lexicon.lists import acceptance_cache_is_stale
+    block = tmp_path / "b.txt"
+    cache = tmp_path / "acc.bin"
+    block.write_text("berlin\n", encoding="utf-8")
+    cache.write_bytes(b"x")
+    os.utime(cache, (time.time() + 10, time.time() + 10))
+    assert not acceptance_cache_is_stale(cache, block)
