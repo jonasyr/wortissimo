@@ -28,6 +28,8 @@ def main() -> int:
     parser.add_argument("--scan", type=int, default=None,
                         help="only consider the first N candidate source words")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument("--resume", action="store_true",
+                        help="keep existing puzzles and top up towards the caps")
     parser.add_argument("--per-difficulty", type=int, default=500,
                         help="max puzzles to keep per difficulty (0 = no cap)")
     args = parser.parse_args()
@@ -47,10 +49,17 @@ def main() -> int:
     candidates = iter_candidates(acceptance, indices)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    if args.out.exists():
+    if args.out.exists() and not args.resume:
         args.out.unlink()
     conn = sqlite3.connect(args.out)
     create_schema(conn)
+
+    already = {
+        d: n for d, n in conn.execute(
+            "SELECT difficulty, COUNT(*) FROM puzzles GROUP BY difficulty")
+    }
+    if already:
+        print(f"  resuming with {sum(already.values()):,} existing puzzles")
 
     def progress(seen: int, written: int) -> None:
         rate = seen / max(1e-9, time.monotonic() - started)
@@ -63,7 +72,7 @@ def main() -> int:
                 for d in ("leicht", "mittel", "schwer", "brutal")}
 
     written = build_puzzles(lexicon, conn, candidates, limit=args.limit,
-                            progress=progress, caps=caps)
+                            progress=progress, caps=caps, already=already)
 
     rows = conn.execute(
         "SELECT difficulty, COUNT(*) FROM puzzles GROUP BY difficulty"

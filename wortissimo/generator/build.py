@@ -71,6 +71,7 @@ def build_puzzles(
     limit: int | None = None,
     progress: Callable[[int, int], None] | None = None,
     caps: Mapping[str, int] | None = None,
+    already: Mapping[str, int] | None = None,
 ) -> int:
     """Generate puzzles for `candidates` and write those that qualify.
 
@@ -83,7 +84,9 @@ def build_puzzles(
     the yield, so without caps the corpus would be almost entirely Leicht.
     """
     written = 0
-    per_difficulty: dict[str, int] = {}
+    # Rows already in the database count towards the caps, so an
+    # interrupted build resumes instead of restarting.
+    per_difficulty: dict[str, int] = dict(already or {})
 
     for seen, source in enumerate(candidates, start=1):
         if limit is not None and written >= limit:

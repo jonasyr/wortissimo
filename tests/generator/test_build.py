@@ -97,3 +97,11 @@ def test_shuffled_candidates_is_deterministic():
     )
     assert shuffled_candidates(lex, seed=1) == shuffled_candidates(lex, seed=1)
     assert sorted(shuffled_candidates(lex)) == sorted(candidate_source_words(lex))
+
+
+def test_already_counts_towards_the_caps_so_a_build_can_resume():
+    c = conn()
+    # Pretend a previous run already wrote the cap for leicht.
+    written = build_puzzles(make_lexicon(), c, [SOURCE],
+                            caps={"leicht": 1}, already={"leicht": 1})
+    assert written == 0
