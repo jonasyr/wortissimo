@@ -25,16 +25,24 @@ def load_raw_words(path: Path = GERMANDICT_TXT) -> Iterator[str]:
                 yield word
 
 
+def iter_normalized(path: Path = GERMANDICT_TXT) -> Iterator[str]:
+    """Stream the word list in canonical form.
+
+    Prefer this over load_normalized() in the build pipeline: materialising
+    the full set and then copying it inside build_lexicon costs ~140MB of
+    peak memory for no benefit.
+    """
+    for raw in load_raw_words(path):
+        try:
+            yield normalize(raw)
+        except ValueError:
+            continue
+
+
 def load_normalized(path: Path = GERMANDICT_TXT) -> set[str]:
     """Return the word list in canonical form.
 
     Entries containing hyphens, apostrophes, digits or spaces are dropped:
     Wortissimo only ever deals in single unhyphenated words.
     """
-    words: set[str] = set()
-    for raw in load_raw_words(path):
-        try:
-            words.add(normalize(raw))
-        except ValueError:
-            continue
-    return words
+    return set(iter_normalized(path))

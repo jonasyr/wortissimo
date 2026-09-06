@@ -2,13 +2,17 @@
 
 import random
 import sqlite3
-from collections.abc import Callable, Iterable, Mapping
+from array import array
+from collections.abc import Callable, Iterable, Iterator, Mapping
 
-from wortissimo.generator.difficulty import classify_difficulty, metrics
+from wortissimo.generator.difficulty import (
+    classify_difficulty, could_qualify, metrics,
+)
 from wortissimo.generator.segment import segment
 from wortissimo.generator.solve import find_accepted, find_solutions
 from wortissimo.generator.store import insert_puzzle
 from wortissimo.lexicon.lists import Lexicon
+from wortissimo.lexicon.packed import PackedWordSet
 
 MIN_SOURCE_LENGTH = 15
 MAX_SOURCE_LENGTH = 40
@@ -25,13 +29,36 @@ def candidate_source_words(lexicon: Lexicon) -> list[str]:
     )
 
 
-def shuffled_candidates(lexicon: Lexicon, seed: int = 0) -> list[str]:
-    """Candidates in a deterministic but unbiased order.
+def candidate_indices(acceptance: PackedWordSet, seed: int = 0) -> array:
+    """Shuffled positions of every plausible source word.
 
-    Scanning the sorted list would take every puzzle from the start of the
-    alphabet and, because short words are far more numerous, skew heavily
+    Holds indices, not strings: the packed acceptance set decodes on
+    access, so materialising a million candidate strings would cost ~76MB
+    where an index array costs ~4MB.
+
+    Shuffling matters for correctness of the sample, not just fairness:
+    scanning in sorted order takes every puzzle from the start of the
+    alphabet and, because short words dominate, skews the corpus heavily
     towards the easiest bucket.
     """
+    indices = array("I", (
+        i for i in range(len(acceptance))
+        if MIN_SOURCE_LENGTH <= len(acceptance.word_at(i)) <= MAX_SOURCE_LENGTH
+    ))
+    random.Random(seed).shuffle(indices)
+    return indices
+
+
+def iter_candidates(
+    acceptance: PackedWordSet, indices: Iterable[int]
+) -> Iterator[str]:
+    """Decode candidate source words one at a time."""
+    for index in indices:
+        yield acceptance.word_at(index)
+
+
+def shuffled_candidates(lexicon: Lexicon, seed: int = 0) -> list[str]:
+    """Eager variant, for tests and small lexicons."""
     words = candidate_source_words(lexicon)
     random.Random(seed).shuffle(words)
     return words
@@ -63,6 +90,12 @@ def build_puzzles(
             break
         if caps and all(per_difficulty.get(d, 0) >= c for d, c in caps.items()):
             break
+
+        # Classify without boundaries first: segmentation is the expensive
+        # step and most candidates fail on solution count alone.
+        solutions = find_solutions(source, lexicon, ())
+        if not could_qualify(source, solutions):
+            continue
 
         boundaries = segment(source, lexicon.solutions)
         solutions = find_solutions(source, lexicon, boundaries)

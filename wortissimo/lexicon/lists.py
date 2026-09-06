@@ -17,12 +17,13 @@ while rejecting ordinary inflected forms such as 'auflagenpunkte'.
 Frequency is retained only for difficulty tuning (see TRIVIAL_ZIPF).
 """
 
-from collections.abc import Container, Mapping
+from collections.abc import Container, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
 from wordfreq import zipf_frequency
 
+from wortissimo.lexicon.packed import PackedWordSet
 from wortissimo.rules.normalize import normalize
 
 # A solution counts as "trivial" — an obvious component the player will
@@ -30,6 +31,7 @@ from wortissimo.rules.normalize import normalize
 TRIVIAL_ZIPF = 5.0
 MIN_LENGTH = 3
 BLOCKLIST_PATH = Path("data/blocklist.txt")
+ACCEPTANCE_CACHE = Path("data/acceptance.bin")
 
 
 class FreqTable(dict):
@@ -57,6 +59,8 @@ class SolutionOracle:
     deferred and memoized instead.
     """
 
+    MAX_CACHE = 400_000
+
     def __init__(self, acceptance: Container[str], authority: Container[str]) -> None:
         self._acceptance = acceptance
         self._authority = authority
@@ -67,13 +71,15 @@ class SolutionOracle:
         if cached is not None:
             return cached
         result = word in self._acceptance and word in self._authority
+        if len(self._cache) >= self.MAX_CACHE:
+            self._cache.clear()
         self._cache[word] = result
         return result
 
 
 @dataclass(frozen=True)
 class Lexicon:
-    acceptance: frozenset[str]
+    acceptance: Container[str]
     solutions: Container[str]
     freq: Mapping[str, float]
 
@@ -100,7 +106,7 @@ def load_blocklist(path: Path = BLOCKLIST_PATH) -> frozenset[str]:
 
 
 def build_lexicon(
-    words: set[str],
+    words: Iterable[str],
     blocklist: Container[str],
     authority: Container[str] | None = None,
     min_length: int = MIN_LENGTH,
@@ -114,7 +120,7 @@ def build_lexicon(
         from wortissimo.lexicon.authority import default_authority
         authority = default_authority()
 
-    acceptance = frozenset(
+    acceptance = PackedWordSet.build(
         w for w in words
         if len(w) >= min_length and w not in blocklist
     )
@@ -123,3 +129,37 @@ def build_lexicon(
         solutions=SolutionOracle(acceptance, authority),
         freq=FreqTable(),
     )
+
+
+def load_or_build_acceptance(
+    words: Iterable[str],
+    blocklist: Container[str],
+    cache: Path = ACCEPTANCE_CACHE,
+    min_length: int = MIN_LENGTH,
+) -> PackedWordSet:
+    """Load the packed acceptance set, building and caching it if absent.
+
+    Building it costs a ~280MB transient peak (sorting 2.15M strings);
+    loading the cached artifact costs ~40MB. On a memory-constrained
+    machine that difference decides whether the build survives.
+    """
+    if cache.exists():
+        return PackedWordSet.load(cache)
+    packed = PackedWordSet.build(
+        w for w in words if len(w) >= min_length and w not in blocklist
+    )
+    packed.save(cache)
+    return packed
+
+
+def lexicon_from_acceptance(
+    acceptance: PackedWordSet,
+    authority: Container[str] | None = None,
+) -> Lexicon:
+    """Assemble a Lexicon around an already-built acceptance set."""
+    if authority is None:
+        from wortissimo.lexicon.authority import default_authority
+        authority = default_authority()
+    return Lexicon(acceptance=acceptance,
+                   solutions=SolutionOracle(acceptance, authority),
+                   freq=FreqTable())

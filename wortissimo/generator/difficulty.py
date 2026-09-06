@@ -104,3 +104,24 @@ def classify_difficulty(
         if _fits(bucket, m):
             return bucket.difficulty
     return None
+
+
+def could_qualify(source: str, solutions: Sequence[Solution]) -> bool:
+    """Cheap pre-check usable BEFORE compound segmentation has run.
+
+    Length, solution count and long-word count do not depend on morpheme
+    boundaries, so they can reject a candidate before paying for
+    segmentation — which is by far the most expensive step and which most
+    candidates do not survive anyway.
+
+    Cross-boundary count and trivial share are deliberately NOT checked
+    here: both change once boundaries are known, so testing them now would
+    reject candidates that would have qualified.
+    """
+    m = metrics(source, solutions)
+    return any(
+        bucket.min_len <= m["length"] <= bucket.max_len
+        and bucket.min_solutions <= m["solution_count"] <= bucket.max_solutions
+        and m["long_count"] >= bucket.min_long
+        for bucket in BUCKETS
+    )

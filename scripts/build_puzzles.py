@@ -9,10 +9,14 @@ import sqlite3
 import time
 from pathlib import Path
 
-from wortissimo.generator.build import build_puzzles, shuffled_candidates
+from wortissimo.generator.build import (
+    build_puzzles, candidate_indices, iter_candidates,
+)
 from wortissimo.generator.store import create_schema
-from wortissimo.lexicon.lists import build_lexicon, load_blocklist
-from wortissimo.lexicon.source import load_normalized
+from wortissimo.lexicon.lists import (
+    lexicon_from_acceptance, load_blocklist, load_or_build_acceptance,
+)
+from wortissimo.lexicon.source import iter_normalized
 
 DEFAULT_OUT = Path("data/puzzles.sqlite")
 
@@ -30,15 +34,17 @@ def main() -> int:
 
     started = time.monotonic()
     print("Loading dictionary...")
-    lexicon = build_lexicon(load_normalized(), load_blocklist())
+    acceptance = load_or_build_acceptance(iter_normalized(), load_blocklist())
+    lexicon = lexicon_from_acceptance(acceptance)
     print(f"  acceptance {len(lexicon.acceptance):,}"
           "  (solutions decided lazily by Hunspell)")
 
-    candidates = shuffled_candidates(lexicon)
-    print(f"  candidate source words {len(candidates):,}")
+    indices = candidate_indices(acceptance)
+    print(f"  candidate source words {len(indices):,}")
     if args.scan:
-        candidates = candidates[: args.scan]
-        print(f"  scanning first {len(candidates):,}")
+        indices = indices[: args.scan]
+        print(f"  scanning first {len(indices):,}")
+    candidates = iter_candidates(acceptance, indices)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     if args.out.exists():

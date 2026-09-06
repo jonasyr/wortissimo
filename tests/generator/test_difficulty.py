@@ -1,4 +1,5 @@
 from wortissimo.generator.difficulty import (
+    could_qualify,
     Difficulty, classify_difficulty, metrics,
 )
 from wortissimo.generator.solve import Category, Solution
@@ -75,3 +76,23 @@ def test_buckets_do_not_overlap_in_length():
     spans = sorted((b.min_len, b.max_len) for b in BUCKETS)
     for (_, prev_max), (next_min, _) in zip(spans, spans[1:]):
         assert prev_max < next_min
+
+
+def test_could_qualify_accepts_a_candidate_before_segmentation():
+    # No boundaries yet, so cross-boundary count is 0; the pre-check must
+    # not reject on it or nothing would ever be segmented.
+    assert could_qualify("a" * 18, sols(13, 3, 0, 0)) is True
+
+
+def test_could_qualify_rejects_on_solution_count():
+    assert could_qualify("a" * 18, sols(3, 3, 0, 0)) is False
+
+
+def test_could_qualify_rejects_on_length():
+    assert could_qualify("a" * 10, sols(13, 3, 0, 0)) is False
+
+
+def test_could_qualify_never_rejects_what_classify_would_accept():
+    shaped = sols(21, 7, 8, 3)
+    assert classify_difficulty("a" * 27, shaped) is not None
+    assert could_qualify("a" * 27, shaped) is True
