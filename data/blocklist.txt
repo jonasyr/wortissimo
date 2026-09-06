@@ -1,0 +1,40 @@
+# Wortissimo blocklist — words never offered as solutions.
+# One normalized (casefolded) word per line. '#' starts a comment.
+# Seeded with common German given names and place names that pass the
+# zipf >= 3.5 frequency floor. Grows from the in-game "bad round" button.
+berlin
+hamburg
+münchen
+köln
+frankfurt
+stuttgart
+bremen
+dresden
+leipzig
+bayern
+sachsen
+hessen
+thomas
+michael
+andreas
+stefan
+christian
+peter
+klaus
+sabine
+julia
+anna
+maria
+martin
+frank
+markus
+wolfgang
+europa
+deutschland
+italien
+spanien
+frankreich
+österreich
+schweiz
+ilm
+genf
