@@ -4,6 +4,21 @@ __pycache__/
 *.pyc
 .venv/
 data/raw/
-*.sqlite
 .DS_Store
 data/*.pkl
+web/node_modules/
+web/dist/
+web/vitest-out.json
+web/*.tsbuildinfo
+
+# Corpus is a committed artifact (2.5MB); everything else derived is not.
+data/*.sqlite
+!data/puzzles.sqlite
+data/acceptance.bin
+data/flagged.txt
+data/*.sqlite-shm
+data/*.sqlite-wal
+web/pw.json
+web/test-results/
+web/playwright-report/
+data/e2e-games.sqlite*

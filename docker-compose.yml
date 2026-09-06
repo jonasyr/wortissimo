@@ -1,0 +1,18 @@
+services:
+  wortissimo:
+    build: .
+    restart: unless-stopped
+    # Reachable on the home server's LAN/Tailscale IP directly.
+    # NOTE: plain HTTP is not a secure context, so iOS will not register
+    # the service worker. Add-to-Home-Screen and standalone display still
+    # work; only offline shell caching is lost. Put it behind
+    # `tailscale serve` (or any TLS terminator) to get that back.
+    ports:
+      - "8000:8000"
+    volumes:
+      - wortissimo-data:/app/data/state
+    environment:
+      WORTISSIMO_GAMES: /app/data/state/games.sqlite
+
+volumes:
+  wortissimo-data:
