@@ -25,7 +25,9 @@ FLAGGED_PATH = Path(os.environ.get("WORTISSIMO_FLAGGED", "data/flagged.txt"))
 class NewGame(BaseModel):
     difficulty: str = "mittel"
     rounds: int = Field(default=10, ge=1, le=50)
-    round_seconds: int = Field(default=180, ge=30, le=900)
+    # 1 to 30 minutes. The ceiling is not arbitrary: a round longer
+    # than half an hour outlives the phone staying awake.
+    round_seconds: int = Field(default=180, ge=60, le=1800)
 
 
 class FlagRound(BaseModel):

@@ -130,7 +130,7 @@ def test_scoring_awards_two_points_for_unique_words(room):
     room.submit(a.id, "u1", "bahn", 1000)
     room.submit(b.id, "u2", "halte", 1000)
     ended = room.end_round(now_ms=200_000)
-    scores = {s["player"]: s["points"] for s in ended.result["scores"]}
+    scores = {s["name"]: s["points"] for s in ended.result["scores"]}
     assert scores["jw"] == 2 and scores["gf"] == 2
 
 
@@ -140,7 +140,7 @@ def test_scoring_awards_one_point_for_a_shared_word(room):
     room.submit(a.id, "u1", "bahn", 1000)
     room.submit(b.id, "u2", "bahn", 1000)
     ended = room.end_round(now_ms=200_000)
-    assert {s["player"]: s["points"] for s in ended.result["scores"]}["jw"] == 1
+    assert {s["name"]: s["points"] for s in ended.result["scores"]}["jw"] == 1
 
 
 def test_round_end_reveals_only_the_revealed_tier(room):
@@ -158,7 +158,7 @@ def test_scoring_does_not_wait_for_a_disconnected_player(room):
     room.start_round(now_ms=0)
     room.submit(a.id, "u1", "bahn", 1000)
     ended = room.end_round(now_ms=200_000)
-    scores = {s["player"]: s["points"] for s in ended.result["scores"]}
+    scores = {s["name"]: s["points"] for s in ended.result["scores"]}
     assert scores["gf"] == 0
     assert scores["jw"] == 2
 

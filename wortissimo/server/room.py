@@ -70,14 +70,29 @@ class Room:
     # ----- players -----
 
     def join(self, name: str, token: str | None) -> Player:
-        """Join, or rejoin as an existing player when the token matches."""
+        """Join, or rejoin as an existing player when the token matches.
+
+        The id is opaque and unrelated to the name. Using the name as the
+        identity collapsed two players into one whenever they typed the
+        same thing — and the lobby's default is "Spieler" for everyone, so
+        two people who never filled in the name box shared a word list, a
+        score, and each other's progress.
+        """
         if token and token in self._by_token:
             return self.players[self._by_token[token]]
-        player = Player(id=name, name=name, token=secrets.token_urlsafe(16))
+        player = Player(
+            id=secrets.token_urlsafe(9),
+            name=name,
+            token=secrets.token_urlsafe(16),
+        )
         self.players[player.id] = player
         self._by_token[player.token] = player.id
         self.totals.setdefault(player.id, 0)
         return player
+
+    def display_name(self, player_id: str) -> str:
+        player = self.players.get(player_id)
+        return player.name if player else player_id
 
     def roster(self) -> list[PlayerInfo]:
         """Everyone in the room, in join order."""
@@ -209,7 +224,9 @@ class Room:
             "source_word": self.round.puzzle.source_word,
             "solution_count": self.round.puzzle.solution_count,
             "scores": [
-                {"player": s.player, "points": s.points,
+                {"player": s.player,
+                 "name": self.display_name(s.player),
+                 "points": s.points,
                  "words": list(s.words), "unique_words": list(s.unique_words)}
                 for s in result.scores
             ],

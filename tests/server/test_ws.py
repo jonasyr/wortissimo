@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -209,7 +210,9 @@ def test_opponent_sees_a_progress_count_but_no_words(client):
                                 "word": "bahn", "round_idx": 0}))
         recv_until(a, "ack")
         progress = recv_until(b, "opponent_progress")
-        assert progress == {"type": "opponent_progress", "player": "jw", "count": 1}
+        # The id is opaque now; what matters is that only a count travels.
+        assert set(progress) == {"type", "player", "count"}
+        assert progress["count"] == 1
 
 
 def test_flagging_a_round_appends_to_the_configured_file(client, tmp_path, monkeypatch):
@@ -219,3 +222,31 @@ def test_flagging_a_round_appends_to_the_configured_file(client, tmp_path, monke
     monkeypatch.setattr(app_module, "FLAGGED_PATH", target)
     assert client.post("/api/flag", json={"source_word": "kalkulation"}).json()["ok"]
     assert target.read_text(encoding="utf-8").strip() == "kalkulation"
+
+
+def test_round_seconds_accepts_the_full_one_to_thirty_minute_range(client):
+    for seconds in (60, 600, 1800):
+        res = client.post("/api/games", json={"difficulty": "mittel",
+                                              "rounds": 3,
+                                              "round_seconds": seconds})
+        assert res.status_code == 200, seconds
+
+
+def test_round_seconds_outside_the_range_is_rejected(client):
+    for seconds in (0, 59, 1801, -30):
+        res = client.post("/api/games", json={"difficulty": "mittel",
+                                              "rounds": 3,
+                                              "round_seconds": seconds})
+        assert res.status_code == 422, seconds
+
+
+def test_the_configured_length_is_what_the_round_actually_uses(client):
+    code = client.post("/api/games", json={"difficulty": "mittel", "rounds": 2,
+                                           "round_seconds": 900}).json()["code"]
+    with client.websocket_connect("/ws") as ws:
+        join(ws, code)
+        ws.send_text(json.dumps({"type": "start_round"}))
+        started = recv_until(ws, "round_started")
+        # 15 minutes from now, within a generous scheduling margin.
+        expected = int(time.time() * 1000) + 900_000
+        assert abs(started["round_ends_at"] - expected) < 5_000
