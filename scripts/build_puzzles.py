@@ -32,7 +32,7 @@ def main() -> int:
     print("Loading dictionary...")
     lexicon = build_lexicon(load_normalized(), load_blocklist())
     print(f"  acceptance {len(lexicon.acceptance):,}"
-          f"  solutions {len(lexicon.solutions):,}")
+          "  (solutions decided lazily by Hunspell)")
 
     candidates = shuffled_candidates(lexicon)
     print(f"  candidate source words {len(candidates):,}")

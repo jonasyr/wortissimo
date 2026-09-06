@@ -7,8 +7,14 @@ Spec section 6: one list cannot serve both runtime jobs.
               mode in this genre, so marginal entries stay in.
 
   solutions   what the game reveals as "words you missed", and the basis
-              for all difficulty computation. Clean. Revealing 'aer' as a
+              for all difficulty computation. Clean. Revealing 'alk' as a
               word the player missed destroys trust in the game.
+
+Membership of `solutions` is decided by Hunspell de_DE, not by corpus
+frequency. Frequency answers "how often does this string occur", which is
+the wrong question: it admitted fragments like 'alk', 'ska' and 'che'
+while rejecting ordinary inflected forms such as 'auflagenpunkte'.
+Frequency is retained only for difficulty tuning (see TRIVIAL_ZIPF).
 """
 
 from collections.abc import Container, Mapping
@@ -19,28 +25,66 @@ from wordfreq import zipf_frequency
 
 from wortissimo.rules.normalize import normalize
 
-# Measured against the real 2.15M-word corpus, not guessed. The floor trades
-# solution-list cleanliness against puzzle density:
-#   3.5 -> 16,441 solutions, median 7 per source word  (too sparse to play)
-#   2.5 -> 72,829 solutions, median 10                 (chosen)
-#   1.5 -> 235,321 solutions, median 11                (junk, barely denser)
-# At 2.5 the marginal words are still real German (entwaffnung, ruppig,
-# ausbaden); below it, place names and noise dominate (tuhh, paulinzella).
-SOLUTION_ZIPF_FLOOR = 2.5
+# A solution counts as "trivial" — an obvious component the player will
+# spot instantly — above this frequency. Used only by difficulty bucketing.
 TRIVIAL_ZIPF = 5.0
 MIN_LENGTH = 3
 BLOCKLIST_PATH = Path("data/blocklist.txt")
 
 
+class FreqTable(dict):
+    """Zipf frequencies, computed on demand and cached.
+
+    Eagerly scoring all 2.15M acceptance words cost ~47s per run for data
+    that only a few thousand words ever need.
+    """
+
+    def __missing__(self, word: str) -> float:
+        value = zipf_frequency(word, "de")
+        self[word] = value
+        return value
+
+    def get(self, word: str, default: float = 0.0) -> float:  # type: ignore[override]
+        return self[word]
+
+
+class SolutionOracle:
+    """Lazy membership test for the revealed solution list.
+
+    Hunspell lookups are ~700/s, so checking every acceptance word up front
+    would take the better part of an hour. Only a few tens of thousands of
+    distinct substrings are ever queried during a build, so the test is
+    deferred and memoized instead.
+    """
+
+    def __init__(self, acceptance: Container[str], authority: Container[str]) -> None:
+        self._acceptance = acceptance
+        self._authority = authority
+        self._cache: dict[str, bool] = {}
+
+    def __contains__(self, word: str) -> bool:
+        cached = self._cache.get(word)
+        if cached is not None:
+            return cached
+        result = word in self._acceptance and word in self._authority
+        self._cache[word] = result
+        return result
+
+
 @dataclass(frozen=True)
 class Lexicon:
     acceptance: frozenset[str]
-    solutions: frozenset[str]
+    solutions: Container[str]
     freq: Mapping[str, float]
 
 
 def load_blocklist(path: Path = BLOCKLIST_PATH) -> frozenset[str]:
-    """Read the manual blocklist: one normalized word per line, # comments."""
+    """Read the manual blocklist: one normalized word per line, # comments.
+
+    Still needed after Hunspell: igerman98 contains famous proper nouns
+    (Berlin, Hamburg, Thomas, Genf) and treats them exactly like common
+    nouns, so they cannot be detected automatically.
+    """
     if not path.exists():
         return frozenset()
     out: set[str] = set()
@@ -55,39 +99,27 @@ def load_blocklist(path: Path = BLOCKLIST_PATH) -> frozenset[str]:
     return frozenset(out)
 
 
-# Short strings need a much higher bar. wordfreq scores three-letter
-# fragments highly because they occur as abbreviations and truncations in
-# real corpora, so a single global floor admits 'alk', 'ska', 'che' and
-# 'tel' alongside genuine short words like 'art' (5.51) and 'ort' (5.31).
-# Revealing the former as words the player "missed" is exactly the failure
-# spec section 6 exists to prevent.
-LENGTH_ZIPF_FLOOR: dict[int, float] = {3: 4.5, 4: 3.5, 5: 3.0}
-
-
-def solution_floor(word: str, base: float = SOLUTION_ZIPF_FLOOR) -> float:
-    """The frequency a word of this length must clear to be a solution."""
-    return LENGTH_ZIPF_FLOOR.get(len(word), base)
-
-
 def build_lexicon(
     words: set[str],
     blocklist: Container[str],
-    solution_zipf_floor: float = SOLUTION_ZIPF_FLOOR,
+    authority: Container[str] | None = None,
     min_length: int = MIN_LENGTH,
 ) -> Lexicon:
     """Split one normalized word set into the acceptance and solution lists.
 
-    Acceptance is deliberately generous. Solutions must clear a
-    length-dependent frequency floor, because short fragments and long
-    words need very different bars to be considered real.
+    `authority` is any container answering "is this a real German word?" —
+    in production a WordAuthority backed by Hunspell, in tests a plain set.
     """
+    if authority is None:
+        from wortissimo.lexicon.authority import default_authority
+        authority = default_authority()
+
     acceptance = frozenset(
         w for w in words
         if len(w) >= min_length and w not in blocklist
     )
-    freq = {w: zipf_frequency(w, "de") for w in acceptance}
-    solutions = frozenset(
-        w for w in acceptance
-        if freq[w] >= solution_floor(w, solution_zipf_floor)
+    return Lexicon(
+        acceptance=acceptance,
+        solutions=SolutionOracle(acceptance, authority),
+        freq=FreqTable(),
     )
-    return Lexicon(acceptance=acceptance, solutions=solutions, freq=freq)

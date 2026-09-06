@@ -7,16 +7,16 @@ is deterministic, debuggable, and retunable by editing one place.
 The thresholds below were measured against the real corpus rather than
 guessed. Sampling 40 source words per length band gave, as median / p75 / p90:
 
-    length   solutions      cross-boundary   >=7 letters
-    15-19     6 /  9 / 10      2 /  3            2 / 3
-    20-24     8 / 11 / 13      3 /  5            3 / 4
-    25-29    12 / 14 / 17      4 /  7            4 / 6
-    30-40    14 / 17 / 18      5 /  7            5 / 7
+    length   solutions       cross-boundary   >=7 letters
+    15-19    10 / 13 / 16      3 /  6            3 /  5
+    20-24    14 / 17 / 20      5 /  8            5 /  7
+    25-29    18 / 21 / 25      8 / 11            8 / 11
+    30-40    19 / 23 / 26      9 / 10            9 / 11
 
-These are the figures AFTER the length-dependent frequency floor removed
-the three-letter fragment noise; counts are roughly 40% lower than with a
-flat floor, but every remaining solution is a word a German speaker will
-accept when it is revealed to them.
+Measured with Hunspell de_DE deciding solution membership. An earlier
+corpus-frequency filter produced roughly 40% fewer solutions AND worse
+ones: it admitted fragments like 'alk' and 'ska' while discarding ordinary
+inflected forms such as 'auflagenpunkte'.
 
 Each bucket targets roughly the top quartile of its band, so puzzles are
 good rather than typical. The corpus has ~1M candidates, so being
@@ -60,10 +60,10 @@ class Bucket:
 # can match; the ordering is kept so that adding an overlapping band later
 # still resolves to the harder one.
 BUCKETS: tuple[Bucket, ...] = (
-    Bucket(Difficulty.BRUTAL, 30, 40, 16, 30, 5, 6, 0.35),
-    Bucket(Difficulty.SCHWER, 25, 29, 13, 20, 4, 5, 0.40),
-    Bucket(Difficulty.MITTEL, 20, 24, 10, 16, 3, 3, 0.45),
-    Bucket(Difficulty.LEICHT, 15, 19,  8, 14, 2, 2, 0.50),
+    Bucket(Difficulty.BRUTAL, 30, 40, 20, 40, 8, 9, 0.35),
+    Bucket(Difficulty.SCHWER, 25, 29, 19, 30, 7, 8, 0.40),
+    Bucket(Difficulty.MITTEL, 20, 24, 15, 24, 5, 5, 0.45),
+    Bucket(Difficulty.LEICHT, 15, 19, 11, 20, 3, 3, 0.50),
 )
 
 

@@ -23,7 +23,7 @@ def sols(n_total, n_long=0, n_cross=0, n_trivial=0):
 
 
 def test_leicht_word_is_classified_leicht():
-    assert classify_difficulty("a" * 18, sols(12, 3, 2, 2)) is Difficulty.LEICHT
+    assert classify_difficulty("a" * 18, sols(13, 3, 3, 2)) is Difficulty.LEICHT
 
 
 def test_brutal_word_is_classified_brutal():
@@ -35,7 +35,7 @@ def test_word_with_too_few_solutions_fits_no_bucket():
 
 
 def test_word_that_is_too_short_fits_no_bucket():
-    assert classify_difficulty("a" * 10, sols(12, 3, 2, 2)) is None
+    assert classify_difficulty("a" * 10, sols(13, 3, 3, 2)) is None
 
 
 def test_word_with_too_few_cross_boundary_solutions_is_rejected():
@@ -49,11 +49,11 @@ def test_too_many_trivial_solutions_is_rejected():
 
 
 def test_schwer_band_is_classified_schwer():
-    assert classify_difficulty("a" * 27, sols(20, 5, 6, 3)) is Difficulty.SCHWER
+    assert classify_difficulty("a" * 27, sols(21, 7, 8, 3)) is Difficulty.SCHWER
 
 
 def test_mittel_band_is_classified_mittel():
-    assert classify_difficulty("a" * 22, sols(15, 4, 4, 2)) is Difficulty.MITTEL
+    assert classify_difficulty("a" * 22, sols(17, 5, 5, 2)) is Difficulty.MITTEL
 
 
 def test_metrics_reports_the_measured_shape():
