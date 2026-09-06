@@ -18,3 +18,7 @@ data/acceptance.bin
 data/flagged.txt
 data/*.sqlite-shm
 data/*.sqlite-wal
+web/pw.json
+web/test-results/
+web/playwright-report/
+data/e2e-games.sqlite*

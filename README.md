@@ -10,20 +10,20 @@ Gültige Wörter geben 1 Punkt, Wörter die nur einer gefunden hat 2 Punkte.
 
 ```bash
 docker compose up -d --build
-sudo tailscale serve --bg --https=443 http://127.0.0.1:8000
-tailscale serve status
 ```
 
-Die ausgegebene `*.ts.net`-Adresse auf dem iPhone in Safari öffnen und über
+Dann auf dem iPhone `http://<homeserver-ip>:8000` öffnen und über
 **Teilen → Zum Home-Bildschirm** installieren.
 
-Das TLS-Zertifikat von Tailscale ist keine Bequemlichkeit, sondern
-Voraussetzung: iOS erlaubt Service Worker und die Installation als App nur
-in einem sicheren Kontext. Über `http://192.168.x.x` funktioniert beides
-nicht.
+Hinweis zum Service Worker: Über einfaches HTTP ist die Seite kein
+"secure context", iOS registriert dort also keinen Service Worker. Das
+Spiel selbst, die Installation auf dem Home-Bildschirm und die
+Standalone-Darstellung funktionieren trotzdem — es fehlt nur das
+Offline-Caching der App-Hülle. Wer das will, stellt TLS davor:
 
-Der Container lauscht bewusst nur auf `127.0.0.1` — der einzige Weg hinein
-führt über Tailscale.
+```bash
+sudo tailscale serve --bg --https=443 http://127.0.0.1:8000
+```
 
 ## Entwicklung
 
