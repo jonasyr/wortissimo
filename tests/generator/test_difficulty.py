@@ -23,7 +23,7 @@ def sols(n_total, n_long=0, n_cross=0, n_trivial=0):
 
 
 def test_leicht_word_is_classified_leicht():
-    assert classify_difficulty("a" * 18, sols(12, 3, 1, 2)) is Difficulty.LEICHT
+    assert classify_difficulty("a" * 18, sols(12, 3, 2, 2)) is Difficulty.LEICHT
 
 
 def test_brutal_word_is_classified_brutal():
@@ -35,7 +35,7 @@ def test_word_with_too_few_solutions_fits_no_bucket():
 
 
 def test_word_that_is_too_short_fits_no_bucket():
-    assert classify_difficulty("a" * 10, sols(12, 3, 1, 2)) is None
+    assert classify_difficulty("a" * 10, sols(12, 3, 2, 2)) is None
 
 
 def test_word_with_too_few_cross_boundary_solutions_is_rejected():

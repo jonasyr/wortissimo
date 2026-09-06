@@ -37,3 +37,4 @@ frankreich
 österreich
 schweiz
 ilm
+genf

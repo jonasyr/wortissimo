@@ -65,3 +65,26 @@ def find_solutions(
                  freq=lexicon.freq.get(word, 0.0))
         for word in sorted(best)
     )
+
+
+def find_accepted(
+    source: str,
+    lexicon: Lexicon,
+    min_length: int = MIN_LENGTH,
+) -> frozenset[str]:
+    """Every substring of `source` the ACCEPTANCE list recognises.
+
+    This is what the live game validates player input against. It is a
+    superset of find_solutions(): generous, so a real German word is never
+    wrongly rejected, but never revealed as a "word you missed".
+
+    Computing it here keeps spec section 4.2 intact — the server still
+    holds no dictionary, only these few hundred strings per puzzle.
+    """
+    n = len(source)
+    return frozenset(
+        word
+        for start in range(n)
+        for end in range(start + min_length, n + 1)
+        if (word := source[start:end]) != source and word in lexicon.acceptance
+    )

@@ -55,6 +55,20 @@ def load_blocklist(path: Path = BLOCKLIST_PATH) -> frozenset[str]:
     return frozenset(out)
 
 
+# Short strings need a much higher bar. wordfreq scores three-letter
+# fragments highly because they occur as abbreviations and truncations in
+# real corpora, so a single global floor admits 'alk', 'ska', 'che' and
+# 'tel' alongside genuine short words like 'art' (5.51) and 'ort' (5.31).
+# Revealing the former as words the player "missed" is exactly the failure
+# spec section 6 exists to prevent.
+LENGTH_ZIPF_FLOOR: dict[int, float] = {3: 4.5, 4: 3.5, 5: 3.0}
+
+
+def solution_floor(word: str, base: float = SOLUTION_ZIPF_FLOOR) -> float:
+    """The frequency a word of this length must clear to be a solution."""
+    return LENGTH_ZIPF_FLOOR.get(len(word), base)
+
+
 def build_lexicon(
     words: set[str],
     blocklist: Container[str],
@@ -63,9 +77,9 @@ def build_lexicon(
 ) -> Lexicon:
     """Split one normalized word set into the acceptance and solution lists.
 
-    The frequency floor of 3.5 was measured, not guessed: it separates
-    ilm (3.09), aer (2.50) and nde (2.44) from raten (4.29), gesetz (4.91)
-    and dank (5.32).
+    Acceptance is deliberately generous. Solutions must clear a
+    length-dependent frequency floor, because short fragments and long
+    words need very different bars to be considered real.
     """
     acceptance = frozenset(
         w for w in words
@@ -73,6 +87,7 @@ def build_lexicon(
     )
     freq = {w: zipf_frequency(w, "de") for w in acceptance}
     solutions = frozenset(
-        w for w in acceptance if freq[w] >= solution_zipf_floor
+        w for w in acceptance
+        if freq[w] >= solution_floor(w, solution_zipf_floor)
     )
     return Lexicon(acceptance=acceptance, solutions=solutions, freq=freq)

@@ -76,3 +76,23 @@ def test_no_boundaries_means_everything_is_obvious():
     lex = make_lexicon({"bahn", "enba"})
     result = find_solutions("strassenbahn", lex, ())
     assert all(s.category is Category.OBVIOUS_COMPONENT for s in result)
+
+
+def test_find_accepted_is_a_superset_of_solutions():
+    from wortissimo.generator.solve import find_accepted
+    lex = Lexicon(acceptance=frozenset({"bahn", "enba", "rass"}),
+                  solutions=frozenset({"bahn"}),
+                  freq={"bahn": 5.0})
+    accepted = find_accepted("strassenbahn", lex)
+    found = words(find_solutions("strassenbahn", lex, ()))
+    assert found <= accepted
+    # 'enba' is a real-enough word to accept but too poor to reveal.
+    assert "enba" in accepted
+    assert "enba" not in found
+
+
+def test_find_accepted_excludes_the_source_word():
+    from wortissimo.generator.solve import find_accepted
+    lex = Lexicon(acceptance=frozenset({"strassenbahn", "bahn"}),
+                  solutions=frozenset(), freq={})
+    assert "strassenbahn" not in find_accepted("strassenbahn", lex)
