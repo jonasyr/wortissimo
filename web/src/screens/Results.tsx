@@ -1,5 +1,6 @@
 interface Score {
   player: string;
+  name: string;
   points: number;
   words: string[];
   unique_words: string[];
@@ -22,10 +23,12 @@ interface Props {
   flagged: boolean;
   roundIdx: number;
   totalRounds: number;
+  onShowStats?: () => void;
 }
 
 export function Results({
   result, finished, onNext, onFlagRound, flagged, roundIdx, totalRounds,
+  onShowStats,
 }: Props) {
   const found = new Set(result.scores.flatMap((s) => s.words)).size;
   const ranked = [...result.scores].sort(
@@ -44,7 +47,7 @@ export function Results({
         {ranked.map((s) => (
           <section key={s.player}>
             <h3>
-              {s.player} — {s.points} Punkte{" "}
+              {s.name} — {s.points} Punkte{" "}
               <span className="muted" style={{ fontWeight: 400 }}>
                 (gesamt {result.totals[s.player] ?? 0})
               </span>
@@ -79,7 +82,10 @@ export function Results({
 
         <div className="row" style={{ paddingBottom: 40 }}>
           {!finished && <button onClick={onNext}>Nächste Runde</button>}
-          {finished && <strong>Spiel vorbei</strong>}
+          {finished && onShowStats && (
+            <button onClick={onShowStats}>Auswertung ansehen</button>
+          )}
+          {finished && !onShowStats && <strong>Spiel vorbei</strong>}
           <button className="ghost" onClick={onFlagRound} disabled={flagged}>
             {flagged ? "Gemeldet" : "Schlechte Runde"}
           </button>

@@ -12,8 +12,8 @@ from pydantic import BaseModel, Field, ValidationError
 from wortissimo.server import db
 from wortissimo.server.hub import Hub
 from wortissimo.server.protocol import (
-    Error, Join, Joined, OpponentProgress, Ping, Pong, Players, StartRound,
-    Submit, parse_client_message,
+    Error, GameEnded, Join, Joined, OpponentProgress, Ping, Pong, Players,
+    StartRound, Submit, parse_client_message,
 )
 
 # I and O are omitted: unreadable next to 1 and 0 on a phone screen.
@@ -122,6 +122,12 @@ def create_app(
                     async def end_now(code: str = code, room=room) -> None:
                         ended = room.end_round(db.now_ms())
                         await hub.broadcast(code, ended)
+                        # The final round is followed by the full history,
+                        # which is what the statistics screen renders.
+                        if room.is_finished:
+                            await hub.broadcast(
+                                code, GameEnded(stats=room.game_stats())
+                            )
 
                     hub.schedule_round_end(code, started.round_ends_at, end_now)
                     await hub.broadcast(code, started)

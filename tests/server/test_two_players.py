@@ -210,3 +210,62 @@ def test_a_player_joining_mid_round_can_still_score(room):
     room.start_round(now_ms=0)
     late = room.join("B", None)
     assert room.submit(late.id, "u1", "bahn", 5000).accepted is True
+
+
+# ---------- end of game statistics ----------
+
+def test_game_stats_has_one_entry_per_played_round(room):
+    a, b = room.join("A", None), room.join("B", None)
+    for i in range(2):
+        room.start_round(now_ms=i * 300_000)
+        room.submit(a.id, f"a{i}", "bahn", i * 300_000 + 1000)
+        room.end_round(now_ms=i * 300_000 + 200_000)
+    stats = room.game_stats()
+    assert [r["idx"] for r in stats["rounds"]] == [0, 1]
+
+
+def test_game_stats_counts_words_per_player_per_round(room):
+    a, b = room.join("A", None), room.join("B", None)
+    room.start_round(now_ms=0)
+    room.submit(a.id, "u1", "bahn", 1000)
+    room.submit(a.id, "u2", "halte", 1100)
+    room.submit(b.id, "u3", "strasse", 1200)
+    room.end_round(now_ms=200_000)
+    per = room.game_stats()["rounds"][0]["per_player"]
+    assert per[a.id]["words"] == 2
+    assert per[b.id]["words"] == 1
+
+
+def test_game_stats_reports_the_longest_word_each_player_found(room):
+    a, b = room.join("A", None), room.join("B", None)
+    room.start_round(now_ms=0)
+    room.submit(a.id, "u1", "bahn", 1000)
+    room.submit(a.id, "u2", "strasse", 1100)
+    room.end_round(now_ms=200_000)
+    per = room.game_stats()["rounds"][0]["per_player"]
+    assert per[a.id]["longest"] == "strasse"
+    assert per[b.id]["longest"] is None
+
+
+def test_game_stats_totals_match_the_running_totals(room):
+    a, b = room.join("A", None), room.join("B", None)
+    for i in range(2):
+        room.start_round(now_ms=i * 300_000)
+        room.submit(a.id, f"a{i}", "bahn", i * 300_000 + 1000)
+        room.submit(b.id, f"b{i}", "halte", i * 300_000 + 1000)
+        room.end_round(now_ms=i * 300_000 + 200_000)
+    stats = room.game_stats()
+    assert stats["totals"] == room.totals
+
+
+def test_game_stats_carries_player_names_for_display(room):
+    room.join("Jonas", None)
+    room.join("Freundin", None)
+    room.start_round(now_ms=0)
+    room.end_round(now_ms=200_000)
+    assert {p["name"] for p in room.game_stats()["players"]} == {"Jonas", "Freundin"}
+
+
+def test_game_stats_is_empty_before_any_round(room):
+    room.join("A", None)
+    assert room.game_stats()["rounds"] == []

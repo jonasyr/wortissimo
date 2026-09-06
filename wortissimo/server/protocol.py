@@ -126,7 +126,7 @@ class RoundEnded(BaseModel):
 
 class GameEnded(BaseModel):
     type: Literal["game_ended"] = "game_ended"
-    scores: dict[str, int]
+    stats: dict
 
 
 class Error(BaseModel):

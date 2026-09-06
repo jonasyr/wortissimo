@@ -244,6 +244,50 @@ class Room:
         db.set_game_state(self._conn, self.game_id, self.state)
         return RoundEnded(idx=idx, result=payload)
 
+    def game_stats(self) -> dict:
+        """Per-round history for the end-of-game summary.
+
+        Recomputed from the append-only submissions table rather than
+        accumulated in memory, so it is correct even after a reconnect.
+        """
+        rounds: list[dict] = []
+        totals: dict[str, int] = {p: 0 for p in self.players}
+
+        for row in self._conn.execute(
+            "SELECT id, idx, puzzle_id FROM rounds WHERE game_id=? ORDER BY idx",
+            (self.game_id,),
+        ):
+            puzzle = self._repo.get(row["puzzle_id"])
+            accepted = db.accepted_words(self._conn, row["id"])
+            for player_id in self.players:
+                accepted.setdefault(player_id, [])
+            result = score_round(accepted, puzzle.revealed)
+
+            per_player: dict[str, dict] = {}
+            for score in result.scores:
+                longest = max(score.words, key=len) if score.words else None
+                per_player[score.player] = {
+                    "points": score.points,
+                    "words": len(score.words),
+                    "unique": len(score.unique_words),
+                    "longest": longest,
+                }
+                totals[score.player] = totals.get(score.player, 0) + score.points
+
+            rounds.append({
+                "idx": row["idx"],
+                "source_word": puzzle.source_word,
+                "solution_count": puzzle.solution_count,
+                "found": len({w for s in result.scores for w in s.words}),
+                "per_player": per_player,
+            })
+
+        return {
+            "players": [p.model_dump() for p in self.roster()],
+            "rounds": rounds,
+            "totals": totals,
+        }
+
     # ----- resync -----
 
     def snapshot(self, player_id: str) -> StateSync:

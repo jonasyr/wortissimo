@@ -4,6 +4,7 @@ import { Lobby } from "./screens/Lobby";
 import { Waiting } from "./screens/Waiting";
 import { Round } from "./screens/Round";
 import { Results, type RoundResult } from "./screens/Results";
+import { Stats, type GameStats } from "./screens/Stats";
 import "./styles.css";
 
 interface Player {
@@ -15,7 +16,8 @@ type View =
   | { kind: "lobby" }
   | { kind: "waiting" }
   | { kind: "round"; sourceWord: string; endsAt: number; solutionCount: number }
-  | { kind: "results"; result: RoundResult; finished: boolean };
+  | { kind: "results"; result: RoundResult; finished: boolean }
+  | { kind: "stats"; stats: GameStats };
 
 export default function App() {
   const [view, setView] = useState<View>({ kind: "lobby" });
@@ -28,6 +30,7 @@ export default function App() {
   const [roundSeconds, setRoundSeconds] = useState(180);
   const [totalRounds, setTotalRounds] = useState(10);
   const [roundIdx, setRoundIdx] = useState(0);
+  const [finalStats, setFinalStats] = useState<GameStats | null>(null);
   const connectionRef = useRef<Connection | null>(null);
 
   const join = (gameCode: string, player: string) => {
@@ -78,9 +81,10 @@ export default function App() {
       setView({ kind: "results", result: m.result, finished: false });
     });
 
-    connection.on("game_ended", () =>
-      setView((v) => (v.kind === "results" ? { ...v, finished: true } : v)),
-    );
+    connection.on("game_ended", (m) => {
+      setFinalStats(m.stats);
+      setView((v) => (v.kind === "results" ? { ...v, finished: true } : v));
+    });
 
     connection.connect();
     setView({ kind: "waiting" });
@@ -89,6 +93,22 @@ export default function App() {
   useEffect(() => connectionRef.current?.watchVisibility(), [view.kind]);
 
   if (view.kind === "lobby") return <Lobby onJoin={join} />;
+
+  if (view.kind === "stats") {
+    return (
+      <Stats
+        stats={view.stats}
+        onAgain={() => {
+          connectionRef.current?.close();
+          connectionRef.current = null;
+          setFinalStats(null);
+          setPlayers([]);
+          setRoundIdx(0);
+          setView({ kind: "lobby" });
+        }}
+      />
+    );
+  }
 
   if (view.kind === "waiting") {
     return (
@@ -124,6 +144,9 @@ export default function App() {
       flagged={flagged}
       roundIdx={roundIdx}
       totalRounds={totalRounds}
+      onShowStats={
+        finalStats ? () => setView({ kind: "stats", stats: finalStats! }) : undefined
+      }
       onNext={() => connectionRef.current?.startRound()}
       onFlagRound={() => {
         setFlagged(true);
