@@ -4,11 +4,12 @@ import os
 import secrets
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ValidationError
 
+from wortissimo.rules.scoring import score_round
 from wortissimo.server import db
 from wortissimo.server.hub import Hub
 from wortissimo.server.protocol import (
@@ -28,6 +29,15 @@ class NewGame(BaseModel):
     # 1 to 30 minutes. The ceiling is not arbitrary: a round longer
     # than half an hour outlives the phone staying awake.
     round_seconds: int = Field(default=180, ge=60, le=1800)
+    # Withhold verdicts until the round ends, the way paper does.
+    blind: bool = False
+
+
+class SoloScoreRequest(BaseModel):
+    """Claims from single-device play. Stateless: no game, no room."""
+
+    solutions: list[str] = Field(default_factory=list, max_length=500)
+    claims: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class FlagRound(BaseModel):
@@ -61,6 +71,46 @@ def create_app(
         with FLAGGED_PATH.open("a", encoding="utf-8") as fh:
             fh.write(f"{body.source_word}\n")
         return {"ok": True}
+
+    @app.get("/api/solo/puzzle")
+    def solo_puzzle(difficulty: str = "mittel") -> dict:
+        """One puzzle for single-device play, solutions included.
+
+        Shipping the solutions is acceptable here and only here: one
+        device, both players in the same room, and the list is revealed a
+        few minutes later regardless. The networked mode never does this.
+        """
+        puzzle = hub.repo.pick(difficulty, exclude=set())
+        if puzzle is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"keine Rätsel für Schwierigkeit {difficulty}",
+            )
+        return {
+            "source_word": puzzle.source_word,
+            "solutions": sorted(puzzle.revealed),
+            "solution_count": puzzle.solution_count,
+        }
+
+    @app.post("/api/solo/score")
+    def solo_score(body: SoloScoreRequest) -> dict:
+        """Score claimed words with the function the live game uses.
+
+        Reimplementing this in the client would be about fifteen lines,
+        and the first time the two drifted the disagreement would surface
+        as an argument between two people at a table with no way to settle
+        it.
+        """
+        result = score_round(body.claims, body.solutions)
+        return {
+            "scores": [
+                {"player": s.player, "points": s.points,
+                 "words": list(s.words), "unique_words": list(s.unique_words)}
+                for s in result.scores
+            ],
+            "shared_words": list(result.shared_words),
+            "missed_words": list(result.missed_words),
+        }
 
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:
@@ -137,11 +187,13 @@ def create_app(
                     ack = room.submit(player_id, msg.client_uuid, msg.word,
                                       db.now_ms())
                     await ws.send_text(ack.model_dump_json())
-                    if ack.accepted:
+                    # In blind mode every entry advances the opponent's
+                    # counter, because ack.accepted is deliberately unknown.
+                    if ack.accepted or room.blind:
                         await hub.broadcast(
                             code,
                             OpponentProgress(player=player_id,
-                                             count=room.progress_count(player_id)),
+                                             count=room.reportable_count(player_id)),
                             exclude=player_id,
                         )
                     continue

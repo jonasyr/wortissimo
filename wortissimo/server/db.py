@@ -139,3 +139,25 @@ def accepted_words(conn: sqlite3.Connection, round_id: int) -> dict[str, list[st
     ):
         out.setdefault(row["player"], []).append(row["word"])
     return out
+
+
+def rejected_words(conn: sqlite3.Connection, round_id: int) -> dict[str, list[str]]:
+    """Words that did not count, per player, in submission order.
+
+    These rows were always recorded; blind mode is simply the first thing
+    that reads them back. Repeats of the same wrong word collapse — the
+    player does not need to be told twice.
+    """
+    out: dict[str, list[str]] = {}
+    seen: set[tuple[str, str]] = set()
+    for row in conn.execute(
+        "SELECT player, word FROM submissions"
+        " WHERE round_id=? AND accepted=0 ORDER BY at, id",
+        (round_id,),
+    ):
+        key = (row["player"], row["word"])
+        if key in seen:
+            continue
+        seen.add(key)
+        out.setdefault(row["player"], []).append(row["word"])
+    return out

@@ -9,6 +9,7 @@ interface Props {
   endsAt: number;
   solutionCount: number;
   opponentCount: number;
+  blind: boolean;
 }
 
 export function Round({
@@ -17,6 +18,7 @@ export function Round({
   endsAt,
   solutionCount,
   opponentCount,
+  blind,
 }: Props) {
   useKeyboardInset();
   const [remaining, setRemaining] = useState(() =>
@@ -44,7 +46,9 @@ export function Round({
 
   useEffect(() => {
     const offAck = connection.on("ack", (msg) => {
-      if (msg.accepted) {
+      // In blind mode the verdict is deliberately unknown, so every entry
+      // is kept and nothing is flashed.
+      if (msg.accepted === null || msg.accepted) {
         setWords((prev) => (prev.includes(msg.word) ? prev : [msg.word, ...prev]));
       } else {
         setFlash(reasonText(msg.reason));
@@ -84,7 +88,7 @@ export function Round({
           {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
         </span>
         <span>
-          {words.length} / {solutionCount}
+          {blind ? `${words.length} notiert` : `${words.length} / ${solutionCount}`}
         </span>
         <span>Sie: {opponentCount}</span>
       </div>

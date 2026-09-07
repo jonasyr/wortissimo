@@ -12,6 +12,8 @@ export interface RoundResult {
   scores: Score[];
   shared_words: string[];
   missed_words: string[];
+  rejected?: Record<string, string[]>;
+  blind?: boolean;
   totals: Record<string, number>;
 }
 
@@ -64,6 +66,20 @@ export function Results({
                 </span>
               ))}
             </div>
+            {(result.rejected?.[s.player]?.length ?? 0) > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <div className="stat-label" style={{ marginBottom: 6 }}>
+                  Falsch
+                </div>
+                <div className="row">
+                  {result.rejected![s.player].map((w) => (
+                    <span className="chip bad" key={w}>
+                      {w}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         ))}
 

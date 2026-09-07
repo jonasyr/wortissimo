@@ -182,7 +182,7 @@ def test_snapshot_never_leaks_the_solution_set(room):
     dumped = room.snapshot(p.id).model_dump()
     assert set(dumped) == {
         "type", "state", "round", "my_words", "scores",
-        "players", "round_seconds", "total_rounds",
+        "players", "round_seconds", "total_rounds", "blind",
     }
     # The roster carries names, never anyone's words.
     for player in dumped["players"]:

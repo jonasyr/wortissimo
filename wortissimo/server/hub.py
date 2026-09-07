@@ -23,7 +23,8 @@ from wortissimo.server.room import Room
 class Hub:
     def __init__(self, conn: sqlite3.Connection, puzzles_path: Path) -> None:
         self._conn = conn
-        self._repo = PuzzleRepo(puzzles_path)
+        self.repo = PuzzleRepo(puzzles_path)
+        self._repo = self.repo
         self._rooms: dict[str, Room] = {}
         self._sockets: dict[str, dict[str, set[WebSocket]]] = {}
         self._timers: dict[str, asyncio.Task] = {}

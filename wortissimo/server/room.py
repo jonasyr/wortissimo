@@ -113,6 +113,11 @@ class Room:
         return int(self.config.get("round_seconds", ROUND_SECONDS))
 
     @property
+    def blind(self) -> bool:
+        """Withhold verdicts until the round ends (spec section 1)."""
+        return bool(self.config.get("blind", False))
+
+    @property
     def is_finished(self) -> bool:
         return self.state == STATE_FINISHED
 
@@ -197,8 +202,32 @@ class Room:
 
     def _remember(self, client_uuid: str, ack: Ack) -> Ack:
         assert self.round is not None
+        if self.blind:
+            # The verdict stays in the database; only the report is muted.
+            ack = Ack(client_uuid=ack.client_uuid, word=ack.word,
+                      accepted=None, reason=None)
         self.round.seen_uuids[client_uuid] = ack
         return ack
+
+    def entered_count(self, player_id: str) -> int:
+        """Submissions made, whatever their verdict.
+
+        Blind mode reports this rather than accepted words: a count that
+        moved only on valid entries would leak, one increment at a time,
+        exactly what the mode exists to withhold.
+        """
+        if self.round is None:
+            return 0
+        (n,) = self._conn.execute(
+            "SELECT COUNT(*) FROM submissions WHERE round_id=? AND player=?",
+            (self.round.row_id, player_id),
+        ).fetchone()
+        return int(n)
+
+    def reportable_count(self, player_id: str) -> int:
+        """What the opponent is allowed to see as progress."""
+        return (self.entered_count(player_id) if self.blind
+                else self.progress_count(player_id))
 
     def progress_count(self, player_id: str) -> int:
         if self.round is None:
@@ -216,6 +245,10 @@ class Room:
 
         # Scored against the revealed tier: accepted-only words still earn
         # points when found, but never appear in the missed list.
+        rejected = db.rejected_words(self._conn, self.round.row_id)
+        for player_id in self.players:
+            rejected.setdefault(player_id, [])
+
         result = score_round(accepted, self.round.puzzle.revealed)
         for score in result.scores:
             self.totals[score.player] = self.totals.get(score.player, 0) + score.points
@@ -232,7 +265,9 @@ class Room:
             ],
             "shared_words": list(result.shared_words),
             "missed_words": list(result.missed_words),
+            "rejected": rejected,
             "totals": dict(self.totals),
+            "blind": self.blind,
         }
 
         idx = self.round.idx
@@ -313,4 +348,5 @@ class Room:
                          my_words=my_words, scores=dict(self.totals),
                          players=self.roster(),
                          round_seconds=self.round_seconds,
-                         total_rounds=self.total_rounds)
+                         total_rounds=self.total_rounds,
+                         blind=self.blind)

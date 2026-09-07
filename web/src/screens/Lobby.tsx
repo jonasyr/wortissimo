@@ -1,7 +1,8 @@
 import { useState } from "react";
 
 interface Props {
-  onJoin: (code: string, player: string) => void;
+  onJoin: (code: string, player: string, blind: boolean) => void;
+  onSolo: () => void;
 }
 
 const DIFFICULTIES = ["leicht", "mittel", "schwer", "brutal"] as const;
@@ -31,13 +32,14 @@ export function parseMinutes(raw: string): number | null {
   return n;
 }
 
-export function Lobby({ onJoin }: Props) {
+export function Lobby({ onJoin, onSolo }: Props) {
   const [player, setPlayer] = useState("");
   const [code, setCode] = useState("");
   const [difficulty, setDifficulty] = useState<string>("mittel");
   const [presetSeconds, setPresetSeconds] = useState(180);
   const [customMinutes, setCustomMinutes] = useState("");
   const [rounds, setRounds] = useState(10);
+  const [blind, setBlind] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,11 +57,16 @@ export function Lobby({ onJoin }: Props) {
       const res = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ difficulty, rounds, round_seconds: roundSeconds }),
+        body: JSON.stringify({
+          difficulty,
+          rounds,
+          round_seconds: roundSeconds,
+          blind,
+        }),
       });
       if (!res.ok) throw new Error(String(res.status));
       const { code: newCode } = await res.json();
-      onJoin(newCode, player.trim() || "Spieler");
+      onJoin(newCode, player.trim() || "Spieler", blind);
     } catch {
       setError("Spiel konnte nicht erstellt werden. Server erreichbar?");
       setBusy(false);
@@ -73,6 +80,15 @@ export function Lobby({ onJoin }: Props) {
         <p className="muted" style={{ margin: 0 }}>
           Finde deutsche Wörter, die zusammenhängend im Rätselwort stecken.
         </p>
+
+        <div className="row">
+          <button type="button" aria-pressed>
+            Zu zweit
+          </button>
+          <button type="button" className="ghost" onClick={onSolo}>
+            Auf Papier
+          </button>
+        </div>
 
         <div>
           <label htmlFor="name">Dein Name</label>
@@ -169,6 +185,25 @@ export function Lobby({ onJoin }: Props) {
           </div>
         </div>
 
+        <div>
+          <label>Auswertung</label>
+          <div className="row" style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className={blind ? "" : "ghost"}
+              onClick={() => setBlind((b) => !b)}
+              aria-pressed={blind}
+            >
+              {blind ? "Blind — erst am Ende" : "Sofort — direkt beim Tippen"}
+            </button>
+          </div>
+          <p className="muted" style={{ margin: "8px 0 0", fontSize: 14 }}>
+            {blind
+              ? "Wie auf Papier: du tippst alles ein und siehst erst am Rundenende, was gezählt hat."
+              : "Jedes Wort wird sofort geprüft."}
+          </p>
+        </div>
+
         <button onClick={create} disabled={busy || customInvalid}>
           {busy
             ? "…"
@@ -201,7 +236,7 @@ export function Lobby({ onJoin }: Props) {
           aria-label="Spielcode"
         />
         <button
-          onClick={() => onJoin(code, player.trim() || "Spieler")}
+          onClick={() => onJoin(code, player.trim() || "Spieler", false)}
           disabled={code.length !== 4}
         >
           Beitreten

@@ -90,7 +90,9 @@ class Ack(BaseModel):
     type: Literal["ack"] = "ack"
     client_uuid: str
     word: str
-    accepted: bool
+    # None in blind mode: the verdict exists and is recorded, it is simply
+    # not reported until the round ends.
+    accepted: bool | None
     reason: str | None = None
 
 
@@ -110,6 +112,7 @@ class StateSync(BaseModel):
     players: list[PlayerInfo] = Field(default_factory=list)
     round_seconds: int = 180
     total_rounds: int = 10
+    blind: bool = False
 
 
 class OpponentProgress(BaseModel):
